@@ -1,16 +1,10 @@
-from dotenv import load_dotenv
 import sys
 import subprocess
-from llama_index.core.agent import ReActAgent
-from llama_index.llms.openai import OpenAI
-from llama_index.core.tools import FunctionTool
+from datalog_gpt.core.agent import ReActAgent
+from datalog_gpt.llms.openai import OpenAI
+from datalog_gpt.core.tools import FunctionTool
 import os
-import io
 import platform
-from contextlib import redirect_stdout, redirect_stderr
-
-load_dotenv()
-
 
 if platform.system() == "Darwin":
     poc_path = "/Users/emacspy/EmacsPyPro/jim-emacs-fun-py/new_poc_files"
@@ -84,39 +78,14 @@ ASSISTANT_SYSTEM_MESSAGE = (
 """
 )
 
-async def poc_python(question, send_msg):
-    # Create a StringIO object to capture stdout and stderr
-    log_capture = io.StringIO()
+# Create the ReActAgent
+agent = ReActAgent.from_tools([generate_code_tool, run_tests_tool, modify_code_tool], llm=llm, verbose=True, context=ASSISTANT_SYSTEM_MESSAGE)
 
-    # Redirect stdout and stderr to our log_capture
-    with redirect_stdout(log_capture), redirect_stderr(log_capture):
-        agent = ReActAgent.from_tools([generate_code_tool, run_tests_tool, modify_code_tool], llm=llm, verbose=True, context=ASSISTANT_SYSTEM_MESSAGE)
-        question = question + ' And test it fine'
-        print("Question:", question)
-        response = agent.chat(question)
-        print(response)
+# Get the question from command line arguments
+question = sys.argv[1] + ' And test it fine'
+print("Question:", question)
 
-    # Get the captured logs
-    logs = log_capture.getvalue()
-
-    # Combine the logs and the response
-    full_response = f"Logs:\n{logs}\n\nRun poc res: {response}"
-
-    # Send the full response
-    await send_msg(full_response)
-
-    # Return both the original response and the logs
-    return {
-        "response": response,
-        "logs": logs
-    }
-
-async def poc_python_simple(question, send_msg):
-    agent = ReActAgent.from_tools([generate_code_tool, run_tests_tool, modify_code_tool], llm=llm, verbose=True, context=ASSISTANT_SYSTEM_MESSAGE)
-    question = question + ' And test it fine'
-    print("Question:", question)
-    response = agent.chat(question)
-    print(response)
-    await send_msg(f"Run poc res: {response}")
-    return response
+# Get the response from the agent
+response = agent.chat(question)
+print(response)
 
