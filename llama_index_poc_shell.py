@@ -1,31 +1,25 @@
 import os
 from dotenv import load_dotenv
 load_dotenv()
-
 from llama_index.core.agent import ReActAgent
 from llama_index.llms.ollama import Ollama
 from llama_index.core.tools import FunctionTool
 from llama_index.core import Settings
+from llama_index.core.callbacks import CallbackManager
+from langfuse.llama_index import LlamaIndexCallbackHandler
 import subprocess
-from flask import Flask, request
-from flask_socketio import SocketIO, send
+import sys
 import json
 
-from llama_index.core.callbacks import CallbackManager 
-from langfuse.llama_index import LlamaIndexCallbackHandler 
 # Set up the Langfuse callback handler
 langfuse_callback_handler = LlamaIndexCallbackHandler()
 Settings.callback_manager = CallbackManager([langfuse_callback_handler])
+
 langfuse_callback_handler.set_trace_params(
   user_id="user-123",
   session_id="session-abc",
   tags=["ReAct shell"]
 )
-
-# Initialize the Flask application
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Define the functions to be used as tools
 def multiply(a: float, b: float) -> float:
@@ -51,23 +45,8 @@ shell_command_tool = FunctionTool.from_defaults(fn=run_shell_command)
 llm = Ollama(model="llama3.1:latest", request_timeout=120.0)
 agent = ReActAgent.from_tools([multiply_tool, add_tool, shell_command_tool], llm=llm, verbose=True)
 
-@socketio.on('message')
-def handle_message(message):
-    print('received message: ' + message)
-    if message == "connect":
-        send("Welcome to the chat!\n")
-    elif message == "not-empty":
-        #send("continue\n")
-        print("continue")
-    else:
-        response = agent.chat(message)
-        # Convert the response to a dictionary or string format
-        response_dict = {
-            "message": f'{response}'
-        }
-        send(json.dumps(response_dict))
+question = sys.argv[1]
+response = agent.chat(question)
 
-# Start the Flask server with SocketIO
-if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=6000)
+print(response)
 
