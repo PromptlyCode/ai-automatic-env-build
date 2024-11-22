@@ -19,6 +19,7 @@ llama-index-embeddings-openai = "^0.1.11"
 llama-parse = "^0.4.9"
 langfuse = "^2.36.1"
 socksio = "^1.0.0"
+ipython = "^8.29.0"
 
 [build-system]
 requires = ["poetry-core"]
