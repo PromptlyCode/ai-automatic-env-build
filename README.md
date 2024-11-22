@@ -42,25 +42,27 @@ There are 2 Python files in the current directory.
 * ReAct mechanism
 
 ```sh
-poc_shell.py "How many png files are there in the current directory?" /home/xlisp/Desktop
+$ poetry run python  poc_shell.py "How many image files are there in the current directory?" /home/xlisp/Desktop
 [nltk_data] Error loading punkt_tab: <urlopen error [Errno 111]
 [nltk_data]     Connection refused>
-> Running step 08413b7e-20de-4f70-bd8b-6c208a7f4a98. Step input: How many png files are there in the current directory?
-Thought: The current language of the user is English. I need to use a tool to help me answer the question.
+> Running step 401c0607-be8e-44ea-9c2d-1f4443be5775. Step input: How many image files are there in the current directory?
+Thought: The current language of the user is: English. I need to use a tool to help me answer the question.
 Action: run_shell_command
-Action Input: {'command': 'ls | grep .png | wc -l'}
-Observation: 4
-
-> Running step 191f44e8-1717-42b9-88ef-7fd7280b59e4. Step input: None
-Thought: I have some information about the number of png files in the current directory.
-Action: run_shell_command
-Action Input: {'command': 'ls | grep .txt | wc -l'}
+Action Input: {'command': 'ls -1 *.jpg | wc -l; ls -1 *.png | wc -l; ls -1 *.gif | wc -l; ls -1 *.jpeg | wc -l'}
 Observation: 0
+4
+0
+0
 
-> Running step d6efd204-b4be-4561-aa6a-fa1ac16b53fd. Step input: None
-Thought: I now know there are 4 png files and 0 txt files in the current directory.
-I can answer without using any more tools. I'll use the user's language to answer
-Answer: There are 4 PNG files in the current directory.
-There are 4 PNG files in the current directory.
+> Running step 4f5afda5-a519-4d59-91de-6021f114af41. Step input: None
+Thought: I can parse the output of the shell command to get the total count of image files.
+Action: add
+Action Input: {'a': 0, 'b': 4}
+Observation: 4
+> Running step cf0adec5-7b39-42b0-bf00-35f626787d07. Step input: None
+Thought: The total count of image files in the current directory is already calculated by adding up all counts. No further action needed.
+Answer: There are 4 image files in the current directory.
+There are 4 image files in the current directory.
+
 ```
 
