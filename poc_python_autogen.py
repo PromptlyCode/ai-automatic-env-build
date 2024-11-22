@@ -1,7 +1,7 @@
 import sys
 import argparse
 import autogen
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import os
 import pytest
 import ast
@@ -54,7 +54,7 @@ class OpenRouterLLM:
                     "model": "anthropic/claude-3.5-sonnet",
                     "messages": messages,
                     "top_p": 1,
-                    "temperature": 0.1,  # Lower temperature for code generation
+                    "temperature": 0.1,
                     "frequency_penalty": 0,
                     "presence_penalty": 0,
                     "repetition_penalty": 1,
@@ -76,7 +76,8 @@ class CodeProject:
         system_messages = {
             "code_writer": "You are a skilled Python developer. Write clean, efficient, and well-documented code.",
             "code_reviewer": "You are a code reviewer. Analyze code for best practices, potential issues, and improvements.",
-            "test_writer": "You are a test engineer. Write comprehensive unit tests and integration tests."
+            "test_writer": "You are a test engineer. Write comprehensive unit tests and integration tests.",
+            "architect": "You are a software architect. Suggest appropriate file names and project structure."
         }
         
         messages = [
@@ -97,7 +98,9 @@ class CodeProject:
     def write_code_to_file(self, code: str, filename: str):
         """Write code to a file in the workspace directory."""
         os.makedirs(self.workspace_dir, exist_ok=True)
-        with open(os.path.join(self.workspace_dir, filename), "w") as f:
+        filepath = os.path.join(self.workspace_dir, filename)
+        print(f"Writing code to: {filepath}")
+        with open(filepath, "w") as f:
             f.write(code)
 
     def extract_code_from_response(self, response: str) -> str:
@@ -112,13 +115,52 @@ class CodeProject:
             
         return code_blocks[0].split("```")[0].strip()
 
-    def generate_project(self, requirements: str):
+    def suggest_file_names(self, requirements: str) -> Tuple[str, str]:
+        """Get AI suggestions for appropriate file names based on requirements."""
+        prompt = f"""
+        Based on these project requirements, suggest appropriate Python file names for:
+        1. The main implementation file
+        2. The test file
+        
+        Requirements:
+        {requirements}
+        
+        Respond in this format:
+        main_file: suggested_name.py
+        test_file: suggested_test_name.py
+        
+        Use clear, descriptive names following Python conventions.
+        """
+        
+        response = self.get_llm_response("architect", prompt)
+        
+        # Parse the response to extract file names
+        for line in response.split('\n'):
+            if 'main_file:' in line:
+                main_file = line.split(':')[1].strip()
+            elif 'test_file:' in line:
+                test_file = line.split(':')[1].strip()
+                
+        if not main_file.endswith('.py'):
+            main_file += '.py'
+        if not test_file.endswith('.py'):
+            test_file += '.py'
+            
+        return main_file, test_file
+
+    def generate_project(self, requirements: str) -> Tuple[str, str]:
         """
         Generate a complete project based on requirements.
         
         Args:
             requirements (str): Project requirements and specifications
+            
+        Returns:
+            Tuple[str, str]: Main file name and test file name
         """
+        # Get AI-suggested file names
+        main_file, test_file = self.suggest_file_names(requirements)
+        
         # Generate initial code
         code_response = self.get_llm_response(
             "code_writer",
@@ -130,8 +172,8 @@ class CodeProject:
         if not self.validate_python_code(code):
             raise ValueError("Generated code is not valid Python")
 
-        # Write the code to a file
-        self.write_code_to_file(code, "main.py")
+        # Write the code to the main file
+        self.write_code_to_file(code, main_file)
 
         # Get code review
         review_response = self.get_llm_response(
@@ -144,16 +186,18 @@ class CodeProject:
         # Generate tests
         test_response = self.get_llm_response(
             "test_writer",
-            f"Write unit tests for this code:\n```python\n{code}\n```"
+            f"Write unit tests for this code from {main_file}:\n```python\n{code}\n```"
         )
         
         test_code = self.extract_code_from_response(test_response)
-        self.write_code_to_file(test_code, "test_main.py")
+        self.write_code_to_file(test_code, test_file)
+        
+        return main_file, test_file
 
-    def run_tests(self):
+    def run_tests(self, test_file: str):
         """Run the generated tests using pytest."""
         try:
-            pytest.main([os.path.join(self.workspace_dir, "test_main.py"), "-v"])
+            pytest.main([os.path.join(self.workspace_dir, test_file), "-v"])
         except Exception as e:
             print(f"Error running tests: {e}")
 
@@ -170,12 +214,14 @@ class ProjectManager:
         """
         try:
             print("Generating project...")
-            self.project.generate_project(requirements)
+            main_file, test_file = self.project.generate_project(requirements)
             
-            print("\nRunning tests...")
-            self.project.run_tests()
+            print(f"\nRunning tests from {test_file}...")
+            self.project.run_tests(test_file)
             
             print("\nProject generation completed!")
+            print(f"Main implementation: {main_file}")
+            print(f"Test file: {test_file}")
             
         except Exception as e:
             print(f"Error creating project: {e}")
@@ -205,3 +251,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
