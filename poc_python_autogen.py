@@ -1,3 +1,5 @@
+import sys
+import argparse
 import autogen
 from typing import Dict, List
 import os
@@ -5,6 +7,28 @@ import pytest
 import ast
 import requests
 import json
+
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Generate and test code projects')
+    parser.add_argument(
+        '--requirements', '-r',
+        type=str,
+        required=True,
+        help='Path to requirements file or direct requirements string'
+    )
+    parser.add_argument(
+        '--workspace', '-w',
+        type=str,
+        default='coding_workspace',
+        help='Directory for generated code and tests (default: coding_workspace)'
+    )
+    parser.add_argument(
+        '--api-key',
+        type=str,
+        help='OpenRouter API key (optional, can also use OPENROUTER_API_KEY env var)'
+    )
+    return parser.parse_args()
 
 class OpenRouterLLM:
     def __init__(self, api_key: str):
@@ -43,8 +67,9 @@ class OpenRouterLLM:
             raise Exception(f"Error generating response: {str(e)}")
 
 class CodeProject:
-    def __init__(self):
-        self.llm = OpenRouterLLM(os.getenv('OPENROUTER_API_KEY'))
+    def __init__(self, workspace_dir: str, api_key: str):
+        self.workspace_dir = workspace_dir
+        self.llm = OpenRouterLLM(api_key)
         
     def get_llm_response(self, role: str, prompt: str) -> str:
         """Get response from LLM based on role and prompt."""
@@ -71,8 +96,8 @@ class CodeProject:
         
     def write_code_to_file(self, code: str, filename: str):
         """Write code to a file in the workspace directory."""
-        os.makedirs("coding_workspace", exist_ok=True)
-        with open(f"coding_workspace/{filename}", "w") as f:
+        os.makedirs(self.workspace_dir, exist_ok=True)
+        with open(os.path.join(self.workspace_dir, filename), "w") as f:
             f.write(code)
 
     def extract_code_from_response(self, response: str) -> str:
@@ -128,13 +153,13 @@ class CodeProject:
     def run_tests(self):
         """Run the generated tests using pytest."""
         try:
-            pytest.main(["coding_workspace/test_main.py", "-v"])
+            pytest.main([os.path.join(self.workspace_dir, "test_main.py"), "-v"])
         except Exception as e:
             print(f"Error running tests: {e}")
 
 class ProjectManager:
-    def __init__(self):
-        self.project = CodeProject()
+    def __init__(self, workspace_dir: str, api_key: str):
+        self.project = CodeProject(workspace_dir, api_key)
 
     def create_project(self, requirements: str):
         """
@@ -155,16 +180,28 @@ class ProjectManager:
         except Exception as e:
             print(f"Error creating project: {e}")
 
-# Example usage
-if __name__ == "__main__":
-    # Example requirements for a simple calculator project
-    requirements = """
-    Create a Calculator class with the following features:
-    1. Basic arithmetic operations (add, subtract, multiply, divide)
-    2. Input validation
-    3. History of operations
-    4. Ability to clear history
-    """
+def read_requirements(requirements_path: str) -> str:
+    """Read requirements from file if path is provided, otherwise return the string directly."""
+    if os.path.isfile(requirements_path):
+        with open(requirements_path, 'r') as f:
+            return f.read()
+    return requirements_path
+
+def main():
+    args = parse_arguments()
     
-    manager = ProjectManager()
+    # Get API key from command line or environment
+    api_key = args.api_key or os.getenv('OPENROUTER_API_KEY')
+    if not api_key:
+        print("Error: OpenRouter API key not provided. Use --api-key or set OPENROUTER_API_KEY environment variable.")
+        sys.exit(1)
+    
+    # Read requirements
+    requirements = read_requirements(args.requirements)
+    
+    # Create and run project
+    manager = ProjectManager(args.workspace, api_key)
     manager.create_project(requirements)
+
+if __name__ == "__main__":
+    main()
