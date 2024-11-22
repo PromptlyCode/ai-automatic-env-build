@@ -69,44 +69,35 @@ I'll review the code for different aspects:
 **Suggestions for Improvement:**
 
 1. **Empty __init__ Method:**
-```python
 def __init__(self):
     pass
-```
 Since the __init__ method is empty, it can be removed entirely as Python will provide a default constructor.
 
 2. **Input Validation:**
 Consider adding input validation for non-numeric inputs:
-```python
 def add(self, x: float, y: float) -> float:
     if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
         raise TypeError("Arguments must be numbers")
     return x + y
-```
 
 3. **Power Method Safety:**
 The power method could use additional error handling:
-```python
 def power(self, x: float, y: float) -> float:
     try:
         return x ** y
     except OverflowError:
         raise ValueError("Result too large to compute")
-```
 
 4. **Constants:**
 Consider adding class-level constants for frequently used values:
-```python
 class Calculator:
     DECIMAL_PRECISION = 10  # if needed for rounding
-```
 
 5. **Testing:**
 Consider adding unit tests in a separate file to test edge cases and normal operations.
 
 6. **Main Function Structure:**
 The main function could be structured better to separate test cases:
-```python
 def main():
     calc = Calculator()
 
@@ -125,7 +116,6 @@ def main():
                 print(f"{name} Error: {e}")
 
     run_tests()
-```
 
 7. **Optional Enhancements:**
 - Add a method to round results to a specified precision
@@ -135,7 +125,6 @@ def main():
 
 8. **Documentation:**
 Consider adding examples in docstrings:
-```python
 def add(self, x: float, y: float) -> float:
     """
     Add two numbers.
@@ -153,7 +142,6 @@ def add(self, x: float, y: float) -> float:
         8.0
     """
     return x + y
-```
 
 Overall, this is a well-written piece of code that follows many Python best practices. The suggestions above would make it more robust and production-ready, but the current implementation is already solid for basic calculator functionality.
 
