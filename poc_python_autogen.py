@@ -5,8 +5,8 @@ from typing import Dict, List, Tuple
 import os
 import pytest
 import ast
-import requests
 import json
+from llm.openrouter import OpenRouterLLM
 
 def parse_arguments():
     """Parse command line arguments."""
@@ -30,47 +30,11 @@ def parse_arguments():
     )
     return parser.parse_args()
 
-class OpenRouterLLM:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        self.base_url = "https://openrouter.ai/api/v1/chat/completions"
-        
-    def generate_response(self, messages: List[Dict]) -> str:
-        """
-        Generate a response using the OpenRouter API.
-        
-        Args:
-            messages: List of message dictionaries with role and content
-        Returns:
-            str: Generated response
-        """
-        try:
-            response = requests.post(
-                url=self.base_url,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}"
-                },
-                data=json.dumps({
-                    "model": "anthropic/claude-3.5-sonnet",
-                    "messages": messages,
-                    "top_p": 1,
-                    "temperature": 0.1,
-                    "frequency_penalty": 0,
-                    "presence_penalty": 0,
-                    "repetition_penalty": 1,
-                    "top_k": 0,
-                })
-            )
-            response.raise_for_status()
-            return response.json()['choices'][0]['message']['content']
-        except Exception as e:
-            raise Exception(f"Error generating response: {str(e)}")
-
 class CodeProject:
     def __init__(self, workspace_dir: str, api_key: str):
         self.workspace_dir = workspace_dir
         self.llm = OpenRouterLLM(api_key)
-        
+
     def get_llm_response(self, role: str, prompt: str) -> str:
         """Get response from LLM based on role and prompt."""
         system_messages = {
@@ -79,12 +43,12 @@ class CodeProject:
             "test_writer": "You are a test engineer. Write comprehensive unit tests and integration tests.",
             "architect": "You are a software architect. Suggest appropriate file names and project structure."
         }
-        
+
         messages = [
             {"role": "system", "content": system_messages[role]},
             {"role": "user", "content": prompt}
         ]
-        
+
         return self.llm.generate_response(messages)
 
     def validate_python_code(self, code: str) -> bool:
@@ -94,7 +58,7 @@ class CodeProject:
             return True
         except SyntaxError:
             return False
-        
+
     def write_code_to_file(self, code: str, filename: str):
         """Write code to a file in the workspace directory."""
         os.makedirs(self.workspace_dir, exist_ok=True)
@@ -109,10 +73,10 @@ class CodeProject:
             block for block in response.split("```python")
             if block.strip() and "```" in block
         ]
-        
+
         if not code_blocks:
             raise ValueError("No code was generated")
-            
+
         return code_blocks[0].split("```")[0].strip()
 
     def suggest_file_names(self, requirements: str) -> Tuple[str, str]:
@@ -121,54 +85,54 @@ class CodeProject:
         Based on these project requirements, suggest appropriate Python file names for:
         1. The main implementation file
         2. The test file
-        
+
         Requirements:
         {requirements}
-        
+
         Respond in this format:
         main_file: suggested_name.py
         test_file: suggested_test_name.py
-        
+
         Use clear, descriptive names following Python conventions.
         """
-        
+
         response = self.get_llm_response("architect", prompt)
-        
+
         # Parse the response to extract file names
         for line in response.split('\n'):
             if 'main_file:' in line:
                 main_file = line.split(':')[1].strip()
             elif 'test_file:' in line:
                 test_file = line.split(':')[1].strip()
-                
+
         if not main_file.endswith('.py'):
             main_file += '.py'
         if not test_file.endswith('.py'):
             test_file += '.py'
-            
+
         return main_file, test_file
 
     def generate_project(self, requirements: str) -> Tuple[str, str]:
         """
         Generate a complete project based on requirements.
-        
+
         Args:
             requirements (str): Project requirements and specifications
-            
+
         Returns:
             Tuple[str, str]: Main file name and test file name
         """
         # Get AI-suggested file names
         main_file, test_file = self.suggest_file_names(requirements)
-        
+
         # Generate initial code
         code_response = self.get_llm_response(
             "code_writer",
             f"Generate Python code based on these requirements: {requirements}"
         )
-        
+
         code = self.extract_code_from_response(code_response)
-        
+
         if not self.validate_python_code(code):
             raise ValueError("Generated code is not valid Python")
 
@@ -188,10 +152,10 @@ class CodeProject:
             "test_writer",
             f"Write unit tests for this code from {main_file}:\n```python\n{code}\n```"
         )
-        
+
         test_code = self.extract_code_from_response(test_response)
         self.write_code_to_file(test_code, test_file)
-        
+
         return main_file, test_file
 
     def run_tests(self, test_file: str):
@@ -208,21 +172,21 @@ class ProjectManager:
     def create_project(self, requirements: str):
         """
         Create a new project with the given requirements.
-        
+
         Args:
             requirements (str): Project requirements and specifications
         """
         try:
             print("Generating project...")
             main_file, test_file = self.project.generate_project(requirements)
-            
+
             print(f"\nRunning tests from {test_file}...")
             self.project.run_tests(test_file)
-            
+
             print("\nProject generation completed!")
             print(f"Main implementation: {main_file}")
             print(f"Test file: {test_file}")
-            
+
         except Exception as e:
             print(f"Error creating project: {e}")
 
@@ -235,20 +199,19 @@ def read_requirements(requirements_path: str) -> str:
 
 def main():
     args = parse_arguments()
-    
+
     # Get API key from command line or environment
     api_key = args.api_key or os.getenv('OPENROUTER_API_KEY')
     if not api_key:
         print("Error: OpenRouter API key not provided. Use --api-key or set OPENROUTER_API_KEY environment variable.")
         sys.exit(1)
-    
+
     # Read requirements
     requirements = read_requirements(args.requirements)
-    
+
     # Create and run project
     manager = ProjectManager(args.workspace, api_key)
     manager.create_project(requirements)
 
 if __name__ == "__main__":
     main()
-
