@@ -30,10 +30,12 @@ def add(a: float, b: float) -> float:
     return a + b
 add_tool = FunctionTool.from_defaults(fn=add)
 
+work_path = sys.argv[2]
+
 def run_shell_command(command: str) -> str:
     """Runs a shell command and returns the output or error"""
     try:
-        result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work_path)
         return result.stdout.decode('utf-8')
     except subprocess.CalledProcessError as e:
         return e.stderr.decode('utf-8')

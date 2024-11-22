@@ -23,7 +23,7 @@ poetry install
 
 ```sh
 
-$ poetry run python  poc_shell.py "How many python files are there in the current directory?"
+$ poetry run python  poc_shell.py "How many python files are there in the current directory?" /home/xlisp/Desktop/ai-automatic-env-build
 [nltk_data] Error loading punkt_tab: <urlopen error [Errno 111]
 [nltk_data]     Connection refused>
 > Running step 71ce7891-50f2-4ca9-a84d-e18dddaa64f0. Step input: How many python files are there in the current directory?
@@ -37,5 +37,30 @@ Thought: I can now infer that there are 2 python files in the current directory.
 Answer: There are 2 Python files in the current directory.
 There are 2 Python files in the current directory.
 
+```
+
+* ReAct mechanism
+
+```sh
+poc_shell.py "How many png files are there in the current directory?" /home/xlisp/Desktop
+[nltk_data] Error loading punkt_tab: <urlopen error [Errno 111]
+[nltk_data]     Connection refused>
+> Running step 08413b7e-20de-4f70-bd8b-6c208a7f4a98. Step input: How many png files are there in the current directory?
+Thought: The current language of the user is English. I need to use a tool to help me answer the question.
+Action: run_shell_command
+Action Input: {'command': 'ls | grep .png | wc -l'}
+Observation: 4
+
+> Running step 191f44e8-1717-42b9-88ef-7fd7280b59e4. Step input: None
+Thought: I have some information about the number of png files in the current directory.
+Action: run_shell_command
+Action Input: {'command': 'ls | grep .txt | wc -l'}
+Observation: 0
+
+> Running step d6efd204-b4be-4561-aa6a-fa1ac16b53fd. Step input: None
+Thought: I now know there are 4 png files and 0 txt files in the current directory.
+I can answer without using any more tools. I'll use the user's language to answer
+Answer: There are 4 PNG files in the current directory.
+There are 4 PNG files in the current directory.
 ```
 
