@@ -27,7 +27,8 @@ generate_code_tool = FunctionTool.from_defaults(fn=generate_code_file)
 def run_test_cases(filename: str) -> str:
     """Run test cases from a specified Python file."""
     try:
-        result = subprocess.run(f'pytest {filename}', shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        #result = subprocess.run(f'pytest {filename}', shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(['zsh', '-c', f'/home/xlisp/anaconda3/bin/pytest {filename}'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         return result.stdout if result.stdout else result.stderr
     except subprocess.CalledProcessError as e:
         return f"Test failed: {e.stderr}"
@@ -53,7 +54,7 @@ modify_code_tool = FunctionTool.from_defaults(fn=modify_code)
 
 # Initialize the LLM
 #llm = OpenAI(model="gpt-4o", max_tokens=2000)
-llm = Ollama(model="llama3.1:latest", request_timeout=120.0)
+llm = Ollama(model="gemma2:latest", request_timeout=120.0)
 
 SYSTEM_MESSAGE_CORE = """You are a helpful assistant that answers user queries based only on given context.
 
