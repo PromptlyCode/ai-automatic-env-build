@@ -21,6 +21,8 @@ langfuse = "^2.36.1"
 socksio = "^1.0.0"
 ipython = "^8.29.0"
 aiohttp = "^3.11.7"
+pyautogen = "^0.3.2"
+pytest = "^8.3.3"
 
 [build-system]
 requires = ["poetry-core"]
