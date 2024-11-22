@@ -1,15 +1,13 @@
 import sys
 import subprocess
-from datalog_gpt.core.agent import ReActAgent
-from datalog_gpt.llms.openai import OpenAI
-from datalog_gpt.core.tools import FunctionTool
+from llama_index.core.agent import ReActAgent
+#from llama_index.llms.openai import OpenAI
+from llama_index.llms.ollama import Ollama
+from llama_index.core.tools import FunctionTool
 import os
 import platform
 
-if platform.system() == "Darwin":
-    poc_path = "/Users/emacspy/EmacsPyPro/jim-emacs-fun-py/new_poc_files"
-else:
-    poc_path = "/home/xlisp/jim-emacs-fun-py/new_poc_files"
+poc_path = sys.argv[2]
 
 # Define the tools
 def generate_code_file(filename: str, content: str) -> str:
@@ -54,7 +52,8 @@ def modify_code(filename: str, modifications: str) -> str:
 modify_code_tool = FunctionTool.from_defaults(fn=modify_code)
 
 # Initialize the LLM
-llm = OpenAI(model="gpt-4o", max_tokens=2000)
+#llm = OpenAI(model="gpt-4o", max_tokens=2000)
+llm = Ollama(model="llama3.1:latest", request_timeout=120.0)
 
 SYSTEM_MESSAGE_CORE = """You are a helpful assistant that answers user queries based only on given context.
 
