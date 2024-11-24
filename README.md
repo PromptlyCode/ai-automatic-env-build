@@ -211,3 +211,52 @@ Test file: test_calculator.py
 
 ```
 
+* poc for web
+
+```sh
+$  poetry run python poc_web_autogen.py  -r "Create a Calculator class with basic arithmetic operations" -w calculator_web_pro
+Setting up project structure...
+Generating web components...
+Writing files...
+Setting up testing environment...
+(node:40068) ExperimentalWarning: CommonJS module /usr/local/lib/node_modules/npm/node_modules/debug/src/node.js is loading ES Module /usr/local/lib/node_modules/npm/node_modules/supports-color/index.js using require().
+Support for loading ES Module in require() is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn deprecated abab@2.0.6: Use your platform's native atob() and btoa() methods instead
+npm warn deprecated domexception@4.0.0: Use your platform's native DOMException instead
+
+added 407 packages, and audited 408 packages in 4m
+
+35 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+Running tests...
+
+> web-project@1.0.0 test
+> jest
+
+ FAIL  tests/app.test.js
+  ● Test suite failed to run
+
+    Cannot find module '@testing-library/jest-dom' from 'tests/app.test.js'
+
+    > 1 | require('@testing-library/jest-dom');
+        |                                     ^
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.<anonymous> (tests/app.test.js:1:37)
+
+Test Suites: 1 failed, 1 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        1.082 s
+Ran all test suites.
+(node:40509) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Error running tests: Command '['npm', 'test']' returned non-zero exit status 1.
+
+Project generation completed!
+Project location: calculator_web_pro
+
+```
