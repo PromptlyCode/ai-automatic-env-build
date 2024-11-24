@@ -7,7 +7,7 @@ import pytest
 import ast
 import json
 from llm.openrouter import OpenRouterLLM
-from cli import parse_arguments, read_requirements
+from command.cli import parse_arguments, read_requirements
 
 class CodeProject:
     def __init__(self, workspace_dir: str, api_key: str):

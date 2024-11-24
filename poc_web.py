@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import subprocess
 import pytest
 from llm.openrouter import OpenRouterLLM
-from cli import parse_arguments, read_requirements
+from command.cli import parse_arguments, read_requirements
 
 @dataclass
 class WebComponent:
