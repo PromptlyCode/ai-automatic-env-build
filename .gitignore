@@ -1,3 +1,5 @@
 .cache/
 coding_workspace/
 *.pyc
+node_modules
+calculator_web_pro
