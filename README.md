@@ -47,13 +47,13 @@ There are 4 image files in the current directory.
 
 ```
 
-* poc for python, look: calculator_pro/
+* poc for python, look: demo_calculator_pro/
 
 ```
-$ poetry run python poc_python.py -r "Create a Calculator class with basic arithmetic operations" -w calculator_pro
+$ poetry run python poc_python.py -r "Create a Calculator class with basic arithmetic operations" -w demo_calculator_pro
 
 Generating project...
-Writing code to: calculator_pro/calculator.py
+Writing code to: demo_calculator_pro/calculator.py
 
 Code Review:
 I'll review the code and provide feedback on different aspects:
@@ -174,7 +174,7 @@ def add(self, x: float, y: float) -> float:
 - For complex calculations, consider using decimal.Decimal for better precision
 
 The code is well-written overall, but implementing some of these suggestions would make it more robust and feature-complete. The choice of which improvements to implement would depend on the specific use case and requirements of the project.
-Writing code to: calculator_pro/test_calculator.py
+Writing code to: demo_calculator_pro/test_calculator.py
 
 Running tests from test_calculator.py...
 ========================================================================= test session starts =========================================================================
@@ -185,18 +185,18 @@ configfile: pyproject.toml
 plugins: anyio-4.6.2.post1
 collected 12 items
 
-calculator_pro/test_calculator.py::TestCalculator::test_initialization PASSED                                                                                   [  8%]
-calculator_pro/test_calculator.py::TestCalculator::test_add PASSED                                                                                              [ 16%]
-calculator_pro/test_calculator.py::TestCalculator::test_subtract PASSED                                                                                         [ 25%]
-calculator_pro/test_calculator.py::TestCalculator::test_multiply PASSED                                                                                         [ 33%]
-calculator_pro/test_calculator.py::TestCalculator::test_divide PASSED                                                                                           [ 41%]
-calculator_pro/test_calculator.py::TestCalculator::test_divide_by_zero PASSED                                                                                   [ 50%]
-calculator_pro/test_calculator.py::TestCalculator::test_clear PASSED                                                                                            [ 58%]
-calculator_pro/test_calculator.py::TestCalculator::test_get_last_result PASSED                                                                                  [ 66%]
-calculator_pro/test_calculator.py::TestCalculator::test_memory_operations PASSED                                                                                [ 75%]
-calculator_pro/test_calculator.py::TestCalculator::test_floating_point_precision PASSED                                                                         [ 83%]
-calculator_pro/test_calculator.py::TestCalculator::test_negative_numbers PASSED                                                                                 [ 91%]
-calculator_pro/test_calculator.py::TestCalculator::test_operation_sequence PASSED                                                                               [100%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_initialization PASSED                                                                                   [  8%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_add PASSED                                                                                              [ 16%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_subtract PASSED                                                                                         [ 25%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_multiply PASSED                                                                                         [ 33%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_divide PASSED                                                                                           [ 41%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_divide_by_zero PASSED                                                                                   [ 50%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_clear PASSED                                                                                            [ 58%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_get_last_result PASSED                                                                                  [ 66%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_memory_operations PASSED                                                                                [ 75%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_floating_point_precision PASSED                                                                         [ 83%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_negative_numbers PASSED                                                                                 [ 91%]
+demo_calculator_pro/test_calculator.py::TestCalculator::test_operation_sequence PASSED                                                                               [100%]
 
 ========================================================================== warnings summary ===========================================================================
 ../../../../opt/anaconda3/envs/ai-automatic-env-build/lib/python3.11/site-packages/_pytest/config/__init__.py:1277
