@@ -169,13 +169,6 @@ class ProjectManager:
         except Exception as e:
             print(f"Error creating project: {e}")
 
-def read_requirements(requirements_path: str) -> str:
-    """Read requirements from file if path is provided, otherwise return the string directly."""
-    if os.path.isfile(requirements_path):
-        with open(requirements_path, 'r') as f:
-            return f.read()
-    return requirements_path
-
 def main():
     args = parse_arguments()
 
