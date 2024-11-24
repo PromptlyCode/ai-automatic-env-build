@@ -7,28 +7,7 @@ import pytest
 import ast
 import json
 from llm.openrouter import OpenRouterLLM
-
-def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Generate and test code projects')
-    parser.add_argument(
-        '--requirements', '-r',
-        type=str,
-        required=True,
-        help='Path to requirements file or direct requirements string'
-    )
-    parser.add_argument(
-        '--workspace', '-w',
-        type=str,
-        default='coding_workspace',
-        help='Directory for generated code and tests (default: coding_workspace)'
-    )
-    parser.add_argument(
-        '--api-key',
-        type=str,
-        help='OpenRouter API key (optional, can also use OPENROUTER_API_KEY env var)'
-    )
-    return parser.parse_args()
+from cli import parse_arguments, read_requirements
 
 class CodeProject:
     def __init__(self, workspace_dir: str, api_key: str):

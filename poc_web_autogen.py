@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import subprocess
 import pytest
 from llm.openrouter import OpenRouterLLM
+from cli import parse_arguments, read_requirements
 
 @dataclass
 class WebComponent:
@@ -15,33 +16,11 @@ class WebComponent:
     javascript: str
     tests: str
 
-def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Generate and test frontend web projects')
-    parser.add_argument(
-        '--requirements', '-r',
-        type=str,
-        required=True,
-        help='Path to requirements file or direct requirements string'
-    )
-    parser.add_argument(
-        '--workspace', '-w',
-        type=str,
-        default='web_workspace',
-        help='Directory for generated web code and tests (default: web_workspace)'
-    )
-    parser.add_argument(
-        '--api-key',
-        type=str,
-        help='OpenRouter API key (optional, can also use OPENROUTER_API_KEY env var)'
-    )
-    return parser.parse_args()
-
 class WebProject:
     def __init__(self, workspace_dir: str, api_key: str):
         self.workspace_dir = workspace_dir
         self.llm = OpenRouterLLM(api_key)
-        
+
     def get_llm_response(self, role: str, prompt: str) -> str:
         """Get response from LLM based on role and prompt."""
         system_messages = {
@@ -63,7 +42,7 @@ class WebProject:
         code_blocks = {}
         current_block = None
         current_content = []
-        
+
         for line in response.split('\n'):
             if line.startswith('```'):
                 if current_block:
@@ -76,28 +55,28 @@ class WebProject:
                         current_block = 'javascript' if block_type in ['js', 'jest'] else block_type
             elif current_block:
                 current_content.append(line)
-                
+
         if current_block:
             code_blocks[current_block] = '\n'.join(current_content)
-            
+
         return code_blocks
 
     def setup_project_structure(self) -> Tuple[str, str, str, str]:
         """Create project directory structure and return file paths."""
         os.makedirs(self.workspace_dir, exist_ok=True)
-        
+
         # Create directories
         src_dir = os.path.join(self.workspace_dir, 'src')
         test_dir = os.path.join(self.workspace_dir, 'tests')
         os.makedirs(src_dir, exist_ok=True)
         os.makedirs(test_dir, exist_ok=True)
-        
+
         # Define file paths
         html_file = os.path.join(src_dir, 'index.html')
         css_file = os.path.join(src_dir, 'styles.css')
         js_file = os.path.join(src_dir, 'app.js')
         test_file = os.path.join(test_dir, 'app.test.js')
-        
+
         return html_file, css_file, js_file, test_file
 
     def generate_web_component(self, requirements: str) -> WebComponent:
@@ -106,13 +85,13 @@ class WebProject:
         html_prompt = f"""
         Create a modern, responsive HTML structure for these requirements:
         {requirements}
-        
+
         Include proper meta tags, semantic HTML5 elements, and accessibility attributes.
         Respond with only the HTML code block.
         """
         html_response = self.get_llm_response("web_developer", html_prompt)
         html_code = self.extract_code_blocks(html_response).get('html', '')
-        
+
         # Generate CSS
         css_prompt = f"""
         Create responsive CSS styles for this HTML:
@@ -121,36 +100,36 @@ class WebProject:
         ```
         Based on these requirements:
         {requirements}
-        
+
         Use modern CSS features, flexbox/grid, and mobile-first approach.
         Include media queries for responsiveness.
         """
         css_response = self.get_llm_response("ui_designer", css_prompt)
         css_code = self.extract_code_blocks(css_response).get('css', '')
-        
+
         # Generate JavaScript
         js_prompt = f"""
         Create JavaScript code to implement the interactive functionality for:
         {requirements}
-        
+
         Work with this HTML:
         ```html
         {html_code}
         ```
-        
+
         Use modern JavaScript (ES6+) features and best practices.
         Include error handling and input validation.
         """
         js_response = self.get_llm_response("web_developer", js_prompt)
         js_code = self.extract_code_blocks(js_response).get('javascript', '')
-        
+
         # Generate Tests
         test_prompt = f"""
         Write Jest tests for this JavaScript code:
         ```javascript
         {js_code}
         ```
-        
+
         Include:
         - Unit tests for functions
         - DOM manipulation tests
@@ -160,25 +139,25 @@ class WebProject:
         """
         test_response = self.get_llm_response("test_engineer", test_prompt)
         test_code = self.extract_code_blocks(test_response).get('javascript', '')
-        
+
         return WebComponent(html_code, css_code, js_code, test_code)
 
     def write_files(self, component: WebComponent, file_paths: Tuple[str, str, str, str]):
         """Write generated code to files."""
         html_file, css_file, js_file, test_file = file_paths
-        
+
         # Write HTML
         with open(html_file, 'w') as f:
             f.write(component.html)
-            
+
         # Write CSS
         with open(css_file, 'w') as f:
             f.write(component.css)
-            
+
         # Write JavaScript
         with open(js_file, 'w') as f:
             f.write(component.javascript)
-            
+
         # Write Tests
         with open(test_file, 'w') as f:
             f.write(component.tests)
@@ -200,11 +179,11 @@ class WebProject:
                 "testEnvironment": "jsdom"
             }
         }
-        
+
         # Write package.json
         with open(os.path.join(self.workspace_dir, 'package.json'), 'w') as f:
             json.dump(package_json, f, indent=2)
-            
+
         # Install dependencies
         subprocess.run(['npm', 'install'], cwd=self.workspace_dir)
 
@@ -224,31 +203,24 @@ class WebProjectManager:
         try:
             print("Setting up project structure...")
             file_paths = self.project.setup_project_structure()
-            
+
             print("Generating web components...")
             component = self.project.generate_web_component(requirements)
-            
+
             print("Writing files...")
             self.project.write_files(component, file_paths)
-            
+
             print("Setting up testing environment...")
             self.project.setup_testing_environment()
-            
+
             print("Running tests...")
             self.project.run_tests()
-            
+
             print("\nProject generation completed!")
             print(f"Project location: {self.project.workspace_dir}")
-            
+
         except Exception as e:
             print(f"Error creating project: {e}")
-
-def read_requirements(requirements_path: str) -> str:
-    """Read requirements from file if path is provided, otherwise return the string directly."""
-    if os.path.isfile(requirements_path):
-        with open(requirements_path, 'r') as f:
-            return f.read()
-    return requirements_path
 
 def main():
     args = parse_arguments()
@@ -268,4 +240,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
