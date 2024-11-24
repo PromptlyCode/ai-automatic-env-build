@@ -49,7 +49,7 @@ There are 4 image files in the current directory.
 * poc for python, look: calculator_pro/
 
 ```
-$ poetry run python poc_python_autogen.py -r "Create a Calculator class with basic arithmetic operations" -w calculator_pro
+$ poetry run python poc_python.py -r "Create a Calculator class with basic arithmetic operations" -w calculator_pro
 
 Generating project...
 Writing code to: calculator_pro/calculator.py
@@ -214,7 +214,7 @@ Test file: test_calculator.py
 * poc for web
 
 ```sh
-$  poetry run python poc_web_autogen.py  -r "Create a Calculator class with basic arithmetic operations" -w calculator_web_pro
+$  poetry run python poc_web.py  -r "Create a Calculator class with basic arithmetic operations" -w calculator_web_pro
 Setting up project structure...
 Generating web components...
 Writing files...

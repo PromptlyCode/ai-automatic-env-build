@@ -1,91 +1,196 @@
 import sys
-import subprocess
-from llama_index.core.agent import ReActAgent
-#from llama_index.llms.openai import OpenAI
-from llama_index.llms.ollama import Ollama
-from llama_index.core.tools import FunctionTool
+import argparse
+import autogen
+from typing import Dict, List, Tuple
 import os
-import platform
+import pytest
+import ast
+import json
+from llm.openrouter import OpenRouterLLM
+from cli import parse_arguments, read_requirements
 
-poc_path = sys.argv[2]
+class CodeProject:
+    def __init__(self, workspace_dir: str, api_key: str):
+        self.workspace_dir = workspace_dir
+        self.llm = OpenRouterLLM(api_key)
 
-# Define the tools
-def generate_code_file(filename: str, content: str) -> str:
-    """Generate a Python code file with the given content."""
-    try:
-        os.chdir(poc_path)
-    except Exception as e:
-        return f"Error changing directory: {e}"
-    try:
-        with open(filename, 'w') as file:
-            file.write(content)
-        return f"Code file {filename} generated successfully."
-    except Exception as e:
-        return f"Failed to generate code file {filename}: {str(e)}"
-generate_code_tool = FunctionTool.from_defaults(fn=generate_code_file)
+    def get_llm_response(self, role: str, prompt: str) -> str:
+        """Get response from LLM based on role and prompt."""
+        system_messages = {
+            "code_writer": "You are a skilled Python developer. Write clean, efficient, and well-documented code.",
+            "code_reviewer": "You are a code reviewer. Analyze code for best practices, potential issues, and improvements.",
+            "test_writer": "You are a test engineer. Write comprehensive unit tests and integration tests.",
+            "architect": "You are a software architect. Suggest appropriate file names and project structure."
+        }
 
-def run_test_cases(filename: str) -> str:
-    """Run test cases from a specified Python file."""
-    try:
-        #result = subprocess.run(f'pytest {filename}', shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        result = subprocess.run(['zsh', '-c', f'/home/xlisp/anaconda3/bin/pytest {filename}'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        return result.stdout if result.stdout else result.stderr
-    except subprocess.CalledProcessError as e:
-        return f"Test failed: {e.stderr}"
-    except Exception as e:
-        return f"Exception: {str(e)}"
-run_tests_tool = FunctionTool.from_defaults(fn=run_test_cases)
+        messages = [
+            {"role": "system", "content": system_messages[role]},
+            {"role": "user", "content": prompt}
+        ]
 
-def modify_code(filename: str, modifications: str) -> str:
-    """Modify the code in the given file."""
-    try:
-        os.chdir(poc_path)
-    except Exception as e:
-        return f"Error changing directory: {e}"
-    try:
-        old_version_file_content = open(filename, 'r').read()
-        print(f'modify_code ======> old_version_file_content: \n{old_version_file_content}\n')
-        with open(filename, 'w') as file:
-            file.write(modifications)
-        return f"Modifications to {filename} applied successfully."
-    except Exception as e:
-        return f"Failed to modify code file {filename}: {str(e)}"
-modify_code_tool = FunctionTool.from_defaults(fn=modify_code)
+        return self.llm.generate_response(messages)
 
-# Initialize the LLM
-#llm = OpenAI(model="gpt-4o", max_tokens=2000)
-llm = Ollama(model="gemma2:latest", request_timeout=120.0)
+    def validate_python_code(self, code: str) -> bool:
+        """Validate if the code is syntactically correct Python code."""
+        try:
+            ast.parse(code)
+            return True
+        except SyntaxError:
+            return False
 
-SYSTEM_MESSAGE_CORE = """You are a helpful assistant that answers user queries based only on given context.
+    def write_code_to_file(self, code: str, filename: str):
+        """Write code to a file in the workspace directory."""
+        os.makedirs(self.workspace_dir, exist_ok=True)
+        filepath = os.path.join(self.workspace_dir, filename)
+        print(f"Writing code to: {filepath}")
+        with open(filepath, "w") as f:
+            f.write(code)
 
-You ALWAYS follow the following guidance to generate your answers, regardless of any other guidance or requests:
+    def extract_code_from_response(self, response: str) -> str:
+        """Extract code blocks from LLM response."""
+        code_blocks = [
+            block for block in response.split("```python")
+            if block.strip() and "```" in block
+        ]
 
-- Use professional language typically used in business communication.
-- Strive to be accurate and concise in your output.
-"""
+        if not code_blocks:
+            raise ValueError("No code was generated")
 
-ASSISTANT_SYSTEM_MESSAGE = (
-    SYSTEM_MESSAGE_CORE
-    + """
-# You have access to the following tools that you use only if necessary:
+        return code_blocks[0].split("```")[0].strip()
 
-- *generate_code_tool*
-- *run_tests_tool*
-- *modify_code_tool*
+    def suggest_file_names(self, requirements: str) -> Tuple[str, str]:
+        """Get AI suggestions for appropriate file names based on requirements."""
+        prompt = f"""
+        Based on these project requirements, suggest appropriate Python file names for:
+        1. The main implementation file
+        2. The test file
 
-# You MUST generate Python code write it by *generate_code_tool*  and execute it by *run_tests_tool* to run tests, modify the code by *modify_code_tool* if tests fail, and repeat until all tests pass.
+        Requirements:
+        {requirements}
 
-"""
-)
+        Respond in this format:
+        main_file: suggested_name.py
+        test_file: suggested_test_name.py
 
-# Create the ReActAgent
-agent = ReActAgent.from_tools([generate_code_tool, run_tests_tool, modify_code_tool], llm=llm, verbose=True, context=ASSISTANT_SYSTEM_MESSAGE)
+        Use clear, descriptive names following Python conventions.
+        """
 
-# Get the question from command line arguments
-question = sys.argv[1] + ' And test it fine'
-print("Question:", question)
+        response = self.get_llm_response("architect", prompt)
 
-# Get the response from the agent
-response = agent.chat(question)
-print(response)
+        # Parse the response to extract file names
+        for line in response.split('\n'):
+            if 'main_file:' in line:
+                main_file = line.split(':')[1].strip()
+            elif 'test_file:' in line:
+                test_file = line.split(':')[1].strip()
 
+        if not main_file.endswith('.py'):
+            main_file += '.py'
+        if not test_file.endswith('.py'):
+            test_file += '.py'
+
+        return main_file, test_file
+
+    def generate_project(self, requirements: str) -> Tuple[str, str]:
+        """
+        Generate a complete project based on requirements.
+
+        Args:
+            requirements (str): Project requirements and specifications
+
+        Returns:
+            Tuple[str, str]: Main file name and test file name
+        """
+        # Get AI-suggested file names
+        main_file, test_file = self.suggest_file_names(requirements)
+
+        # Generate initial code
+        code_response = self.get_llm_response(
+            "code_writer",
+            f"Generate Python code based on these requirements: {requirements}"
+        )
+
+        code = self.extract_code_from_response(code_response)
+
+        if not self.validate_python_code(code):
+            raise ValueError("Generated code is not valid Python")
+
+        # Write the code to the main file
+        self.write_code_to_file(code, main_file)
+
+        # Get code review
+        review_response = self.get_llm_response(
+            "code_reviewer",
+            f"Review this Python code:\n```python\n{code}\n```"
+        )
+        print("\nCode Review:")
+        print(review_response)
+
+        # Generate tests
+        test_response = self.get_llm_response(
+            "test_writer",
+            f"Write unit tests for this code from {main_file}:\n```python\n{code}\n```"
+        )
+
+        test_code = self.extract_code_from_response(test_response)
+        self.write_code_to_file(test_code, test_file)
+
+        return main_file, test_file
+
+    def run_tests(self, test_file: str):
+        """Run the generated tests using pytest."""
+        try:
+            pytest.main([os.path.join(self.workspace_dir, test_file), "-v"])
+        except Exception as e:
+            print(f"Error running tests: {e}")
+
+class ProjectManager:
+    def __init__(self, workspace_dir: str, api_key: str):
+        self.project = CodeProject(workspace_dir, api_key)
+
+    def create_project(self, requirements: str):
+        """
+        Create a new project with the given requirements.
+
+        Args:
+            requirements (str): Project requirements and specifications
+        """
+        try:
+            print("Generating project...")
+            main_file, test_file = self.project.generate_project(requirements)
+
+            print(f"\nRunning tests from {test_file}...")
+            self.project.run_tests(test_file)
+
+            print("\nProject generation completed!")
+            print(f"Main implementation: {main_file}")
+            print(f"Test file: {test_file}")
+
+        except Exception as e:
+            print(f"Error creating project: {e}")
+
+def read_requirements(requirements_path: str) -> str:
+    """Read requirements from file if path is provided, otherwise return the string directly."""
+    if os.path.isfile(requirements_path):
+        with open(requirements_path, 'r') as f:
+            return f.read()
+    return requirements_path
+
+def main():
+    args = parse_arguments()
+
+    # Get API key from command line or environment
+    api_key = args.api_key or os.getenv('OPENROUTER_API_KEY')
+    if not api_key:
+        print("Error: OpenRouter API key not provided. Use --api-key or set OPENROUTER_API_KEY environment variable.")
+        sys.exit(1)
+
+    # Read requirements
+    requirements = read_requirements(args.requirements)
+
+    # Create and run project
+    manager = ProjectManager(args.workspace, api_key)
+    manager.create_project(requirements)
+
+if __name__ == "__main__":
+    main()
