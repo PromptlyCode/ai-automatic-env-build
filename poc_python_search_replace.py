@@ -1,22 +1,42 @@
 import autogen
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 import re
 import tempfile
 import os
 import pytest
 import shutil
+import requests
+import json
+from llm.openrouter import OpenRouterLLM
+
+class CustomAssistantAgent(autogen.AssistantAgent):
+    def __init__(self, name: str, llm_config: dict, openrouter_llm: OpenRouterLLM):
+        super().__init__(name=name, llm_config=llm_config)
+        self.openrouter_llm = openrouter_llm
+
+    def generate_reply(self, messages: List[Dict]):
+        """Override the default generate_reply to use OpenRouterLLM"""
+        try:
+            response = self.openrouter_llm.generate_response(messages)
+            return response
+        except Exception as e:
+            print(f"Error generating reply: {e}")
+            return None
 
 class CodeModifier:
-    def __init__(self, temperature=0.7):
+    def __init__(self, api_key: str):
+        # Initialize OpenRouterLLM
+        self.llm = OpenRouterLLM(api_key)
+
         # Configure the assistant and user proxies
-        self.assistant = autogen.AssistantAgent(
+        self.assistant = CustomAssistantAgent(
             name="assistant",
             llm_config={
-                "temperature": temperature,
-                "config_list": [{"model": "gpt-4"}],
-            }
+                "temperature": 0.1,
+            },
+            openrouter_llm=self.llm
         )
-        
+
         self.user_proxy = autogen.UserProxyAgent(
             name="user_proxy",
             human_input_mode="NEVER",
@@ -30,9 +50,9 @@ class CodeModifier:
                 content = f.read()
 
             # Parse the diff block
-            search_pattern = re.search(r'<<<<<<< SEARCH\n(.*?)\n=======\n(.*?)\n>>>>>>> REPLACE', 
+            search_pattern = re.search(r'<<<<<<< SEARCH\n(.*?)\n=======\n(.*?)\n>>>>>>> REPLACE',
                                     diff_block, re.DOTALL)
-            
+
             if not search_pattern:
                 return False
 
@@ -61,13 +81,13 @@ class CodeModifier:
 
     def process_code(self, problem_description: str, target_files: List[str], max_iterations: int = 5) -> bool:
         """Main workflow to process code modifications and testing."""
-        
+
         # Create a temporary working directory
         with tempfile.TemporaryDirectory() as temp_dir:
             # Copy target files to workspace
             for file_path in target_files:
                 shutil.copy(file_path, temp_dir)
-            
+
             iteration = 0
             while iteration < max_iterations:
                 # Generate conversation messages
@@ -76,14 +96,14 @@ class CodeModifier:
                         "role": "user",
                         "content": f"""
                         Problem: {problem_description}
-                        
+
                         Current code files:
                         {self._read_files(target_files)}
-                        
+
                         Please generate:
                         1. Code modifications in diff format
                         2. Pytest test cases
-                        
+
                         Use this diff format:
                         <<<<<<< SEARCH
                         (original code)
@@ -154,15 +174,15 @@ class CodeModifier:
 
 # Example usage
 if __name__ == "__main__":
-    modifier = CodeModifier()
-    
+    api_key = os.getenv('OPENROUTER_API_KEY')
+    modifier = CodeModifier(api_key=api_key)
+
     problem = """
-    Fix the implementation of the calculate_average function to handle empty lists 
+    Fix the implementation of the calculate_average function to handle empty lists
     and return the correct average of numbers.
     """
-    
+
     target_files = ["math_utils.py"]
-    
+
     success = modifier.process_code(problem, target_files)
     print(f"Code modification {'succeeded' if success else 'failed'}")
-
