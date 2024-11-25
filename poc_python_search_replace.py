@@ -129,13 +129,19 @@ class CodeModifier:
                     messages=messages
                 )
 
-                if not chat_response:
+                # Extract the last message from the assistant
+                last_message = None
+                for message in chat_response.chat_history:  # Changed from messages to chat_history
+                    if isinstance(message, dict) and message.get("role") == "assistant":
+                        last_message = message.get("content", "")
+
+                if not last_message:
                     print("No response from assistant")
                     break
 
                 # Extract modifications and tests
-                diff_blocks = self._extract_diff_blocks(chat_response)
-                test_code = self._extract_test_code(chat_response)
+                diff_blocks = self._extract_diff_blocks(last_message)
+                test_code = self._extract_test_code(last_message)
 
                 if not diff_blocks or not test_code:
                     print("No valid modifications or tests found")
