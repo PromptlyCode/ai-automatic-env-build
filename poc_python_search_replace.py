@@ -23,6 +23,11 @@ class CustomAssistantAgent(autogen.AssistantAgent):
         """Override the default generate_reply to use OpenRouterLLM"""
         try:
             response = self.openrouter_llm.generate_response(messages)
+            
+            # Check for conversation termination keywords
+            if any(word.lower() in response.lower() for word in ["end", "goodbye"]):
+                self.terminate_conversation = True
+            
             return response
         except Exception as e:
             print(f"Error generating reply: {e}")
@@ -119,15 +124,24 @@ class CodeModifier:
                         =======
                         (modified code)
                         >>>>>>> REPLACE
+
+                        If the modifications and tests are successful, end your response with "end".
                         """
                     }
                 ]
+
+                # Reset termination flag before starting new conversation
+                self.assistant.terminate_conversation = False
 
                 # Initiate the conversation
                 chat_response = self.user_proxy.initiate_chat(
                     self.assistant,
                     messages=messages
                 )
+
+                # Check if the conversation was terminated
+                if hasattr(self.assistant, 'terminate_conversation') and self.assistant.terminate_conversation:
+                    print("Conversation ended by assistant")
 
                 # Extract diff blocks and test code
                 diff_blocks = self._extract_diff_blocks(chat_response)
