@@ -24,10 +24,10 @@ class CustomAssistantAgent(autogen.AssistantAgent):
             # Only generate a response for new messages
             if isinstance(self.last_message_received, dict) and "terminate" in self.last_message_received.get("content", "").lower():
                 return None
-
+            print(f"CustomAssistantAgent: msg ===== {messages}")
             response = self.openrouter_llm.generate_response(messages)
+            print(f"CustomAssistantAgent: res ---- {response}")
             return response
         except Exception as e:
             print(f"Error generating reply: {e}")
             return None
-
