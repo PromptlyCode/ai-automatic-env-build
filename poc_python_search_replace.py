@@ -13,6 +13,12 @@ class CustomAssistantAgent(autogen.AssistantAgent):
     def __init__(self, name: str, llm_config: dict, openrouter_llm: OpenRouterLLM):
         super().__init__(name=name, llm_config=llm_config)
         self.openrouter_llm = openrouter_llm
+        self.last_message_received = None
+
+    def receive(self, message: Union[str, Dict], sender: autogen.Agent, request_reply: Optional[bool] = None, silent: Optional[bool] = False):
+        """Override receive to store the last message"""
+        self.last_message_received = message
+        return super().receive(message, sender, request_reply, silent)
 
     def generate_reply(
         self,
@@ -20,41 +26,31 @@ class CustomAssistantAgent(autogen.AssistantAgent):
         sender: Optional[autogen.Agent] = None,
         **kwargs
     ) -> Union[str, Dict, None]:
-        """Override the default generate_reply to use OpenRouterLLM"""
+        """Override generate_reply to use OpenRouterLLM"""
         try:
+            # Only generate a response for new messages
+            if isinstance(self.last_message_received, dict) and "terminate" in self.last_message_received.get("content", "").lower():
+                return None
+
             response = self.openrouter_llm.generate_response(messages)
-            
-            # Check for conversation termination keywords
-            if any(word.lower() in response.lower() for word in ["end", "goodbye"]):
-                self.terminate_conversation = True
-            
             return response
         except Exception as e:
             print(f"Error generating reply: {e}")
             return None
 
-    def __call__(self, *args, **kwargs):
-        # Keep the original __call__ behavior
-        return super().__call__(*args, **kwargs)
-
 class CodeModifier:
     def __init__(self, api_key: str):
-        # Initialize OpenRouterLLM
         self.llm = OpenRouterLLM(api_key)
-        
-        # Configure the assistant and user proxies
         self.assistant = CustomAssistantAgent(
             name="assistant",
-            llm_config={
-                "temperature": 0.1,
-            },
+            llm_config={"temperature": 0.1},
             openrouter_llm=self.llm
         )
-        
         self.user_proxy = autogen.UserProxyAgent(
             name="user_proxy",
             human_input_mode="NEVER",
             code_execution_config={"work_dir": "workspace"},
+            max_consecutive_auto_reply=2  # Limit consecutive auto-replies
         )
 
     def apply_diff(self, file_path: str, diff_block: str) -> bool:
@@ -63,24 +59,21 @@ class CodeModifier:
             with open(file_path, 'r') as f:
                 content = f.read()
 
-            # Parse the diff block
-            search_pattern = re.search(r'<<<<<<< SEARCH\n(.*?)\n=======\n(.*?)\n>>>>>>> REPLACE', 
+            search_pattern = re.search(r'<<<<<<< SEARCH\n(.*?)\n=======\n(.*?)\n>>>>>>> REPLACE',
                                     diff_block, re.DOTALL)
-            
+
             if not search_pattern:
                 return False
 
             search_code = search_pattern.group(1)
             replace_code = search_pattern.group(2)
 
-            # Apply the replacement
-            new_content = content.replace(search_code, replace_code)
-
-            # Write the modified content
-            with open(file_path, 'w') as f:
-                f.write(new_content)
-
-            return True
+            if search_code in content:  # Only replace if the search pattern exists
+                new_content = content.replace(search_code, replace_code)
+                with open(file_path, 'w') as f:
+                    f.write(new_content)
+                return True
+            return False
         except Exception as e:
             print(f"Error applying diff: {e}")
             return False
@@ -88,88 +81,100 @@ class CodeModifier:
     def run_tests(self, test_file: str) -> Tuple[bool, str]:
         """Run pytest and return results."""
         try:
-            pytest.main(["-v", test_file])
-            return True, "Tests passed"
+            result = pytest.main(["-v", test_file])
+            return result == pytest.ExitCode.OK, "Tests passed" if result == pytest.ExitCode.OK else "Tests failed"
         except Exception as e:
             return False, str(e)
 
-    def process_code(self, problem_description: str, target_files: List[str], max_iterations: int = 5) -> bool:
+    def process_code(self, problem_description: str, target_files: List[str], max_iterations: int = 3) -> bool:
         """Main workflow to process code modifications and testing."""
-        
-        # Create a temporary working directory
         with tempfile.TemporaryDirectory() as temp_dir:
             # Copy target files to workspace
             for file_path in target_files:
+                if not os.path.exists(file_path):
+                    print(f"Error: File {file_path} not found")
+                    return False
                 shutil.copy(file_path, temp_dir)
-            
+
             iteration = 0
             while iteration < max_iterations:
-                # Generate conversation messages
+                print(f"\nIteration {iteration + 1}/{max_iterations}")
+
                 messages = [
                     {
                         "role": "user",
                         "content": f"""
                         Problem: {problem_description}
-                        
+
                         Current code files:
                         {self._read_files(target_files)}
-                        
+
                         Please generate:
                         1. Code modifications in diff format
                         2. Pytest test cases
-                        
-                        Use this diff format:
+
+                        Use this format for code modifications:
                         <<<<<<< SEARCH
                         (original code)
                         =======
                         (modified code)
                         >>>>>>> REPLACE
-
-                        If the modifications and tests are successful, end your response with "end".
                         """
                     }
                 ]
 
-                # Reset termination flag before starting new conversation
-                self.assistant.terminate_conversation = False
-
-                # Initiate the conversation
+                # Get response from assistant
                 chat_response = self.user_proxy.initiate_chat(
                     self.assistant,
                     messages=messages
                 )
 
-                # Check if the conversation was terminated
-                if hasattr(self.assistant, 'terminate_conversation') and self.assistant.terminate_conversation:
-                    print("Conversation ended by assistant")
+                if not chat_response:
+                    print("No response from assistant")
+                    break
 
-                # Extract diff blocks and test code
+                # Extract modifications and tests
                 diff_blocks = self._extract_diff_blocks(chat_response)
                 test_code = self._extract_test_code(chat_response)
 
-                # Apply diffs to each file
-                for file_path in target_files:
-                    for diff in diff_blocks:
-                        self.apply_diff(os.path.join(temp_dir, os.path.basename(file_path)), diff)
+                if not diff_blocks or not test_code:
+                    print("No valid modifications or tests found")
+                    break
 
-                # Write test file
+                # Apply modifications
+                applied_any = False
+                for file_path in target_files:
+                    temp_file_path = os.path.join(temp_dir, os.path.basename(file_path))
+                    for diff in diff_blocks:
+                        if self.apply_diff(temp_file_path, diff):
+                            applied_any = True
+
+                if not applied_any:
+                    print("No modifications were applied")
+                    break
+
+                # Write and run tests
                 test_file_path = os.path.join(temp_dir, "test_generated.py")
                 with open(test_file_path, 'w') as f:
                     f.write(test_code)
 
-                # Run tests
                 success, test_output = self.run_tests(test_file_path)
+                print(f"Test result: {test_output}")
+
                 if success:
-                    # Copy modified files back to original location
+                    # Copy successful modifications back
                     for file_path in target_files:
                         shutil.copy(
                             os.path.join(temp_dir, os.path.basename(file_path)),
                             file_path
                         )
+                    print("Successfully modified code and passed tests")
                     return True
 
                 iteration += 1
-                print(f"Iteration {iteration}: Tests failed, generating new modifications...")
+                if iteration >= max_iterations:
+                    print(f"Reached maximum iterations ({max_iterations})")
+                    break
 
             return False
 
@@ -188,7 +193,6 @@ class CodeModifier:
 
     def _extract_test_code(self, response: str) -> str:
         """Extract pytest code from the response."""
-        # Look for code blocks containing pytest
         pattern = r'```python\s*(import pytest.*?)```'
         match = re.search(pattern, response, re.DOTALL)
         if match:
@@ -197,17 +201,15 @@ class CodeModifier:
 
 # Example usage
 if __name__ == "__main__":
- 
     api_key = os.getenv('OPENROUTER_API_KEY')
     modifier = CodeModifier(api_key=api_key)
-   
+
     problem = """
-    Fix the implementation of the calculate_average function to handle empty lists 
+    Fix the implementation of the calculate_average function to handle empty lists
     and return the correct average of numbers.
     """
-    
-    target_files = ["math_utils.py"]
-    
-    success = modifier.process_code(problem, target_files)
-    print(f"Code modification {'succeeded' if success else 'failed'}")
 
+    target_files = ["math_utils.py"]
+
+    success = modifier.process_code(problem, target_files, max_iterations=3)
+    print(f"\nFinal result: Code modification {'succeeded' if success else 'failed'}")
