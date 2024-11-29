@@ -8,6 +8,7 @@
 - [x] AI generates python, corrects environmental problems and learns code, POC fast verification: for example, write a Python algorithm based on the data in the project code.
 - [x] AI generates web: html, javascript, css
 - [x] Integration provides API for VSCode and Emacs extension, use command
+- [ ] AI Refactoring: After the function is cut and copied, it is divided into different files, and then AI automatically fixes the run error
 
 ## Init
 
